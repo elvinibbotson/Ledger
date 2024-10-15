@@ -1,0 +1,23 @@
+{
+  "short_name": "getty",
+  "version": "3",
+  "icons": [
+  	{
+    	"src": "getty192.png",
+    	"sizes": "192x192",
+    	"type": "image/png",
+    	"purpose": "any"
+    },
+	{
+    "src": "getty512.png",
+    	"sizes": "512x512",
+    	"type": "image/png",
+    	"purpose": "any"
+    }
+  ],
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation":"portrait",
+  "background_color": "black",
+  "theme_color": "black"
+}
