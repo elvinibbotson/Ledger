@@ -307,7 +307,7 @@ function openTx() {
 		id('txTextField').disabled=true;
 		id('txTransferChooser').disabled=true;
 		id('txMonthly').disabled=true;
-		if((n>1)&&(txIndex==(n-1))) { // can only delete B/F if it is only transaction - effectively deletes account
+		if((n>1)&&(txIndex<1)) { // can only delete B/F if it is only transaction - effectively deletes account
 		    id('buttonDeleteTx').disabled=true;
 		}
 	}
@@ -400,6 +400,7 @@ function openAccount() {
 					console.log(">50 transactions - deleting earliest");
 					if(transactions[1].text!='gain') transactions[1].amount+=transactions[0].amount; // create new B/F item for account
 					transactions[1].text="B/F";
+					transactions[1].monthly=false;
 					request=dbObjectStore.put(transactions[1]); // update transaction in database
 					request.onsuccess=function(event)  {console.log("new B/F transaction  updated");};
 					request.onerror=function(event) {console.log("error updatingnew B/F transaction");};
@@ -667,16 +668,6 @@ console.log('backupWeek: '+backupWeek+'; changed: '+changed);
 totals=JSON.parse(window.localStorage.getItem('totals')); // grand totals for each monthly backup
 console.log('totals: '+totals);
 if(totals==null) totals=[];
-/* TEMPORARY FIX
-else {
-	for(var i=0;i<12;i++) {
-		if(totals[i]<0) totals[i]=null;
-		else if(totals[i]>80000000) totals[i]-=10000000;
-	}
-	alert('totals:'+JSON.stringify(totals));
-	window.localStorage.setItem('totals',JSON.stringify(totals));
-}
-*/
 console.log(totals.length+' totals');
 var request=window.indexedDB.open("transactionsDB",2);
 request.onerror=function(event) {
