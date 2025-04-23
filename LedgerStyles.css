@@ -133,7 +133,7 @@ select {
     list-style: none;
     display: flex;
     flex-direction: column;
-    background-color: #333;
+    background-color: dimgray;
     padding: 0 0.5em;
 }
 
@@ -227,7 +227,7 @@ select {
     width: 100%;
     position: relative;
     color: white;
-    background-color: #333;
+    background-color: dimgray;
 }
 
 #heading {
