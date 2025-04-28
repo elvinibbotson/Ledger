@@ -7,18 +7,22 @@ var accountNames=[];
 var account=null;
 var acIndex=null;
 var investment=false;
-var transactions=[];
+var logData=null;
+var logs=[]; // replaces transactions
+var log=null;
+// var transactions=[];
 var tx=null;
 var grandTotal=0;
 var totals=[];
-var listName='Accounts';
+var list=[];
+// var listName='Ledger';
 var currentDialog=null;
 var view='list';
 var canvas=null;
 var today;
-var thisWeek; // weeks since 1st Sept 1970
-var backupWeek=0; // week of last backup;
-var changed=false; // changes since last backup?
+// var thisWeek; // weeks since 1st Sept 1970
+// var backupWeek=0; // week of last backup;
+// var changed=false; // changes since last backup?
 var months="JanFebMarAprMayJunJulAugSepOctNovDec";
 // DRAG LEFT/RIGHT ACTIONS
 id('main').addEventListener('touchstart', function(event) {
@@ -267,7 +271,7 @@ function toggleDialog(d,visible) {
 }
 // OPEN SELECTED TRANSACTION FOR EDITING
 function openTx() {
-	tx=transactions[txIndex];
+	tx=logs[list[txIndex]];
 	console.log("transaction date: "+tx.date);
 	console.log("open transaction: "+txIndex+"; "+tx.text);
 	toggleDialog('txDialog',true);
@@ -326,7 +330,7 @@ function listAccounts() {
 	console.log("list "+accounts.length+" accounts");
   	var item = null;
 	id('list').innerHTML="";
-	var html="Accounts";
+	var html="Ledger";
 	if(accounts.length>0) {
 	    accounts.sort(function(a,b) { return (a.name>b.name)?1:-1}); //alpha-sort on account names
 		console.log("accounts sorted - first: "+accounts[0].name);
@@ -361,9 +365,16 @@ function listAccounts() {
 			id('txTransferChooser').options.add(ac);
 	  	}
 	  	console.log("transfer option 0: "+id('txTransferChooser').options[0].text);
-		html="Accounts <i>"+pp(grandTotal)+"</i>";
+		html="Ledger <i>"+pp(grandTotal)+"</i>";
+		today=new Date();
+		var month=today.getMonth()+1;
+		console.log('save total '+grandTotal+' for month '+month);
+		totals[month]=grandTotal; // saves grand total for each monthly backup
+		window.localStorage.setItem('totals',JSON.stringify(totals));
+		console.log('save totals... '+totals);
 	}
 	id('headerTitle').innerHTML=html;
+	/*
 	today=new Date();
 	thisWeek=Math.floor(today.getTime()/604800000); // weeks since Jan 1st 1970
 	console.log('this week: '+thisWeek+'; backupWeek: '+backupWeek);
@@ -371,11 +382,27 @@ function listAccounts() {
         console.log("BACKUP");
         backup();
     }
+    */
 }
 // OPEN ACCOUNT
 function openAccount() {
     account=accounts[acIndex];
 	console.log("open account #"+acIndex+": "+account.name);
+	// NEW CODE...
+	list=[];
+	for(var i=0;i<logs.length;i++) { // build list of indeces of account logs
+		if(logs[i].account==account.name) list.push(i);
+	}
+	if(list.length>50) {
+		console.log(">50 transactions - delete earliest");
+		if(logs[list[0]].text!='gain') logs[list[1]].amount+=logs[list[0]].amount; // create new B/F item for account
+		logs[list[1]].text="B/F";
+		logs[list[1]].monthly=false;
+		logs.splice[list[0],1]; // delete earliest account log...
+		list.shift(); // ...and remove from list
+	}
+	buildTransactionsList();
+	/*
 	transactions=[];
 	var dbTransaction=db.transaction('logs',"readwrite");
 	console.log("indexedDB transaction ready");
@@ -418,6 +445,7 @@ function openAccount() {
 	request.onerror==function(err) {
 		alert(err.message);
 	}
+	*/
 }
 // LIST ACCOUNT TRANSACTIONS
 function buildTransactionsList() {
@@ -428,8 +456,61 @@ function buildTransactionsList() {
 	 var d="";
 	 var mon=0;
 	 var balance=0;
-	 console.log("list "+transactions.length+" transactions");
-	 for(var i in transactions) {
+	 console.log("list "+list.length+" transactions");
+	 // NEW CODE...
+	 for(var i in list) {
+	 	if(logs[list[i]].text=='gain') balance=logs[list[i].amount];
+	 	else balance+=logs[list[i]].amount;
+	 	logs[list[i]].balance=balance;
+	 	console.log('account balance: '+balance);
+	 }
+	 for(i=list.length-1;i>=0;i--) { // list in reverse order
+	 	var listItem=document.createElement('li');
+		listItem.index=i;
+	  	listItem.classList.add('list-item');
+		tx=logs[list[i]];
+		var itemCheck=document.createElement('input');
+	 	itemCheck.setAttribute('type','checkbox');
+	 	itemCheck.setAttribute('class','check');
+	 	itemCheck.index=i;
+	 	itemCheck.checked=tx.checked;
+	 	itemCheck.addEventListener('change',function() { // toggle.checked property
+	 	    tx=logs[list[this.index]];
+	 	    tx.checked=!tx.checked;
+	 	    console.log("checked is "+tx.checked);
+	 	    logs[list[this.index]]=tx;
+	 	    /*
+	 	    var dbTransaction=db.transaction('logs',"readwrite");
+        	var dbObjectStore=dbTransaction.objectStore('logs');
+	        console.log("database ready");
+	 	    var request=dbObjectStore.put(tx); // update transaction in database
+		    request.onsuccess=function(event)  {
+			    console.log("transaction "+tx.id+" updated");
+    		};
+		    request.onerror = function(event) {console.log("error updating transaction "+tx.id);};
+		    */
+	 	});
+	 	listItem.appendChild(itemCheck);
+		var itemText=document.createElement('span');
+		itemText.style='margin-right:50px;';
+		itemText.index=i;
+		d=tx.date;
+		mon=parseInt(d.substr(5,2))-1;
+		console.log('month '+mon);
+		mon*=3;
+		d=d.substr(8,2)+" "+months.substr(mon,3)+" "+d.substr(2,2);
+		html="<span class='date'>"+d+"</span><span class='comment'>"+trim(tx.text,10)+"</span>";
+		var a=tx.amount;
+		if(investment && tx.text=='gain') a=tx.amount-transactions[i-1].balance;
+		if(a<0) html+="<span class='amount-debit'>";
+		else html+="<span class='amount'>";
+		html+=pp(a);
+		itemText.innerHTML=html;
+		itemText.addEventListener('click', function(){txIndex=this.index; openTx();});
+		listItem.appendChild(itemText);
+		id('list').appendChild(listItem);
+	 }
+	 /* for(var i in transactions) {
 	 	if(transactions[i].text=='gain') balance=transactions[i].amount; // NEW
 		else balance+=transactions[i].amount;
 		transactions[i].balance=balance; // save balance after each transaction in account
@@ -476,6 +557,7 @@ function buildTransactionsList() {
 		listItem.appendChild(itemText);
 		id('list').appendChild(listItem);
 	 }
+	 */
 	 id('txSign').innerHTML='-'; // default to debit
 	 accounts[acIndex].balance=balance;
 	 html=trim(account.name,12)+" <i>";
@@ -487,12 +569,12 @@ function buildTransactionsList() {
 // DRAW ACCOUNT GRAPH
 function drawGraph() {
 	console.log('ACCOUNT GRAPH');
-	var firstDay=day(transactions[0].date); // whole days
-	var lastDay=day(transactions[transactions.length-1].date);
+	var firstDay=day(logs[list[0]].date); // whole days
+	var lastDay=day(logs[list[list.length-1]].date);
 	var n=lastDay-firstDay;
 	var dayW=scrW/n; // pixels/day
 	console.log('graph spans '+n+' days from '+firstDay+' to '+lastDay+' dayW: '+dayW);
-	console.log('screen width: '+scrW+'; '+transactions.length+' transactions'); // canvasL is '+canvasL+'; width is '+id('canvas').width);
+	console.log('screen width: '+scrW+'; '+list.length+' transactions'); // canvasL is '+canvasL+'; width is '+id('canvas').width);
 	id('graphPanel').style.display='block';
 	// draw graph of balance against days/transactions
 	var h=scrH/12;
@@ -501,11 +583,9 @@ function drawGraph() {
 	canvas.lineJoin='round';
 	canvas.lineWidth=3;
 	canvas.beginPath();
-	for(i=0;i<transactions.length;i++) {
-		// var val=transactions[i].balance/100;
-		var val=transactions[i].balance/5000000;
-		var x=(day(transactions[i].date)-firstDay)*dayW;
-		// var y=scrH/2-val*ppp; // £0.00 is at mid-screen
+	for(i=0;i<list.length;i++) {
+		var val=logs[list[i]].balance/5000000;
+		var x=(day(logs[list[i]].date)-firstDay)*dayW;
 		var y=scrH-3*h-val*h;
 		console.log('balance: '+val+'point '+i+': '+x+','+y);
 		if(i<1) canvas.moveTo(x,y);
@@ -537,6 +617,7 @@ function drawTotals() {
 	canvas.textAlign='left';
 	var w=scrW/12;
 	var h=scrH/12;
+	today=new Date();
 	var offset=11-today.getMonth(); // latest month is at right of screen
 	for(var i=0;i<12;i++) {
 		console.log('total '+i+': '+totals[i]);
@@ -571,8 +652,21 @@ id("fileChooser").addEventListener('change', function() {
 	  	var data=evt.target.result;
 		var json=JSON.parse(data);
 		console.log("json: "+json);
-		var logs=json.logs;
+		logs=[];
+		for(var i=0;i<json.logs.length;i++) { // import without any log.id
+			log={};
+			log.date=json.logs[i].date;
+			log.account=json.logs[i].account;
+			log.amount=json.logs[i].amount;
+			log.text=json.logs[i].text;
+			log.checked=json.logs[i].checked;
+			log.transfer=json.logs[i].transfer;
+			log.monthly=json.logs[i].monthly;
+			log.balance=json.logs[i].balance;
+			logs.push(log);
+		}
 		console.log(logs.length+" logs loaded");
+		/*
 		var dbTransaction=db.transaction('logs',"readwrite");
 		var dbObjectStore=dbTransaction.objectStore('logs');
 		for(var i=0;i<logs.length;i++) {
@@ -583,6 +677,13 @@ id("fileChooser").addEventListener('change', function() {
 			};
 			request.onerror=function(e) {console.log("error adding log");};
 		}
+		*/
+		if(json.totals) totals=json.totals
+		console.log('totals: '+totals);
+		var data=JSON.stringify(logs);
+		window.localStorage.setItem('logData',data);
+		data=JSON.stringify(totals);
+		window.localStorage.setItem('totals',data);
 		toggleDialog('importDialog',false);
 		display("backup imported - restart");
   	});
@@ -590,8 +691,26 @@ id("fileChooser").addEventListener('change', function() {
 });
 // BACKUP
 function backup() {
-	backupWeek=thisWeek;
-  	var fileName="Ledger-"+backupWeek+".json";
+	/*
+	var month=today.getMonth()+1;
+	console.log('save total '+grandTotal+' for month '+month);
+	totals[month]=grandTotal; // saves grand total for each monthly backup
+	window.localStorage.setItem('totals',JSON.stringify(totals));
+	*/
+  	var fileName="LedgerData.json";
+  	var data={'logs':logs,'totals':totals};
+  	var json=JSON.stringify(data);
+	var blob=new Blob([json], {type:"data:application/json"});
+  	var a=document.createElement('a');
+	a.style.display='none';
+    var url=window.URL.createObjectURL(blob);
+	console.log("data ready to save: "+blob.size+" bytes");
+   	a.href=url;
+   	a.download=fileName;
+    document.body.appendChild(a);
+    a.click();
+    display(fileName+" saved to downloads folder");
+  	/*
 	var dbTransaction=db.transaction('logs',"readwrite");
 	var dbObjectStore=dbTransaction.objectStore('logs');
 	console.log("database ready");
@@ -621,16 +740,13 @@ function backup() {
    			a.download=fileName;
     		document.body.appendChild(a);
     		a.click();
+    		/*
 			console.log('save backupWeek: '+backupWeek);
 			window.localStorage.setItem('backupWeek',backupWeek); // remember week of backup...
 			window.localStorage.setItem('changed',false); // and reset 'changed'
-			var month=today.getMonth()+1;
-			console.log('save total '+grandTotal+' for month '+month);
-			totals[month]=grandTotal; // saves grand total for each monthly backup
-			window.localStorage.setItem('totals',JSON.stringify(totals));
-			display(fileName+" saved to downloads folder");
-		}
-	}
+			*/
+		// }
+	// }
 }
 function id(el) {
 	return document.getElementById(el);
@@ -653,22 +769,120 @@ function day(d) { // get day number from date d
 }
 // START-UP CODE
 console.log("START");
-var scrW=screen.width; // NEW CODE - SET UP FOR GRAPHS
+var scrW=screen.width;
 var scrH=screen.height;
 console.log('screen size: '+scrW+'x'+scrH+'px');
 id("canvas").width=scrW;
 id("canvas").height=scrH;
 console.log('canvas size: '+id("canvas").width+'x'+id("canvas").height);
 canvas=id('canvas').getContext('2d');
-backupWeek=window.localStorage.getItem('backupWeek'); // week of last backup
-if(backupWeek==null) backupWeek=0;
-changed=window.localStorage.getItem('changed'); // any changes since last backup
-if(changed==null) changed=false;
-console.log('backupWeek: '+backupWeek+'; changed: '+changed);
+// backupWeek=window.localStorage.getItem('backupWeek'); // week of last backup
+// if(backupWeek==null) backupWeek=0;
+// changed=window.localStorage.getItem('changed'); // any changes since last backup
+// if(changed==null) changed=false;
+// console.log('backupWeek: '+backupWeek+'; changed: '+changed);
 totals=JSON.parse(window.localStorage.getItem('totals')); // grand totals for each monthly backup
 console.log('totals: '+totals);
 if(totals==null) totals=[];
 console.log(totals.length+' totals');
+logData=window.localStorage.getItem('logData');
+if(logData && logData!='undefined') {
+	logs=JSON.parse(logData); // restore saved logs
+	// var json=JSON.parse(logData); // restore saved data
+	// logs=json.logs;
+	console.log(logs.length+' logs restored');
+	logs.sort(function(a,b) { return Date.parse(a.date)-Date.parse(b.date)}); //chronological order
+	// build accounts array
+   	accounts=[];
+	var acNames=[];
+    var n=0;
+    for(var i in logs) { // build list of accounts
+		var today=new Date();
+		var month=today.getFullYear()*12+today.getMonth()+1; // months count
+    	today=today.getDate();
+    	if(logs[i].monthly) { // deal with monthly repeats
+    		console.log("monthly repeat check");
+			var transfer=false;
+    		var txDate=logs[i].date; // YYYY-MM-DD
+    		var txMonth=parseInt(txDate.substr(0,4))*12+parseInt(txDate.substr(5,2)); // months count
+    		var txDay=txDate.substr(8,2);
+    		if((((month-txMonth)>1))||(((month-txMonth)==1)&&(today>=txDay))) { // one month or more later
+    			console.log(">> add repeat transaction for "+logs[i].text);
+				logs[i].monthly=false; // cancel monthly repeat
+    			/* put amended transaction in indexedDB
+				var request=dbObjectStore.put(transactions[i]); // update transaction in database
+				request.onsuccess=function(event)  {
+					console.log("transaction updated");
+				};
+				request.onerror=function(event) {
+					console.log("error updating transfer/monthly: "+request.error);
+				};
+				*/
+    			var tx={}; // create repeat transaction
+    			tx.account=logs[i].account;
+    			console.log('repeat tx account: '+tx.account);
+    			txMonth+=1; // next month (could be next year too)
+    			tx.date=Math.floor(txMonth/12).toString()+"-";
+				txMonth%=12;
+    			if(txMonth<10) tx.date+='0'; // isoDate+="0";
+    			tx.date+=txMonth.toString()+"-"+txDay;
+    			console.log('repeat tx date: '+tx.date);
+    			console.log("monthly transaction date: "+txDate+"; repeat: "+tx.date);
+    			tx.amount=logs[i].amount;
+    			tx.checked=false;
+				tx.text=logs[i].text;
+				tx.transfer=logs[i].transfer;
+    			var transferTX={};
+    			if(tx.transfer!="none") {
+    				transfer=true;
+    				transferTX.account=tx.transfer;
+    				transferTX.checked=false;
+					transferTX.date=tx.date;
+					transferTX.amount=-1*tx.amount;
+    				transferTX.text=tx.account;
+    				transferTX.monthly=false;
+    			}
+    			tx.monthly=true;
+    			logs.push(tx);
+    			/* put new repeat transaction in indexedDB
+    			request=dbObjectStore.add(tx);  // add new transaction to database
+				request.onsuccess=function(event) {
+					console.log("repeat transaction added");
+				};
+				request.onerror=function(event) {
+					console.log("error adding new repeat transaction: "+request.error);
+				};
+				*/
+			}
+			if(transfer) { // IF MONTHLY TRANSACTION IS TRANSFER CREATE RECIPROCAL TRANSACTION
+				logs.push(transferTX);
+				/*
+				request=dbObjectStore.add(transferTX);
+				request.onsuccess=function(event) {
+					display("reciprocal transaction created to match repeated transaction");
+				}
+				request.onerror=function(event) {
+					alert("error creating repeated reciprocal transaction");
+				}
+				*/
+			}
+    	}  // END OF REPEAT TRANSACTION CODE
+    	n=acNames.indexOf(logs[i].account);
+		if(n<0) {
+	  		console.log("add account "+logs[i].account);
+	  		acNames.push(logs[i].account);
+	  		accounts.push({name: logs[i].account, balance: logs[i].amount});
+	  	}
+	  	else {
+	  		if(logs[i].text=='gain') accounts[n].balance=logs[i].amount;
+			else accounts[n].balance+=logs[i].amount;
+	  	}
+    }
+  	console.log(accounts.length+" accounts");
+	listAccounts();
+}
+else toggleDialog('importDialog',true);
+/*
 var request=window.indexedDB.open("transactionsDB",2);
 request.onerror=function(event) {
 	alert("indexedDB error");
