@@ -143,9 +143,10 @@ id('buttonAddNewAccount').addEventListener('click',function() {
 		tx.transfer="none";
 		if(id('newAccountInvestmentFlag').checked) tx.transfer="investment";
 		tx.monthly=false;
-		transactions.push(tx);
+		logs.push(tx);
 		toggleDialog('newAccountDialog', false);
 		listAccounts();
+		/*
 		var dbTransaction=db.transaction('logs',"readwrite");
 		console.log("indexedDB transaction ready");
 		var dbObjectStore=dbTransaction.objectStore('logs');
@@ -153,6 +154,8 @@ id('buttonAddNewAccount').addEventListener('click',function() {
 		var request=dbObjectStore.add(tx);
 		request.onsuccess=function(event) {console.log("transaction added - investment: "+tx.transfer);};
 		request.onerror=function(event) {console.log("error adding new transaction");};
+		*/
+		logs.push(tx);
 	  }
 })
 // CHANGE TRANSACTION DATE
@@ -190,37 +193,47 @@ function saveTx(adding) {
 	else {
 		var i=id('txTransferChooser').selectedIndex;
 		var transfer=id('txTransferChooser').options[i].text;
-		console.log("transfer change to:"+transfer);
+		console.log("transfer to:"+transfer);
 		if((transfer=="none")||(transfer==tx.transfer)) transfer=null; // (usually) no need to create reciprocal transaction
 		tx.transfer=id('txTransferChooser').options[i].text;
 	}
 	tx.monthly=id('txMonthly').checked;
     toggleDialog('txDialog',false);
     console.log("save transaction - date: "+tx.date+" "+tx.amount+"p - "+tx.text+" app.txIndex: "+txIndex);
+    /*
     var dbTransaction=db.transaction('logs',"readwrite");
 	console.log("indexedDB transaction ready");
 	var dbObjectStore=dbTransaction.objectStore('logs');
 	console.log("indexedDB objectStore ready");
+	*/
 	if(adding) { // add new transaction
-		var earliest=transactions[0].date; // date of earliest transaction inaccount
+		var earliest=logs[0].date; // date of earliest transaction in account
 		console.log("add new transaction date "+tx.date+" - oldest is "+earliest);
 		if(tx.date<earliest) display("TOO EARLY");
 		else { // add new transaction to indexedDB
+			logs.push(tx);
+			console.log("transaction added");
+			/*
 			var request=dbObjectStore.add(tx);
 			request.onsuccess=function(event) {
 				console.log("new transaction added");
 				openAccount(); // reloads and sorts account transactions
 			};
 			request.onerror=function(event) {console.log("error adding new transaction");};
+			*/
 		}
 	}
 	else { // update existing transaction
+		logs[list[txIndex]]=tx;
+		console.log('transaction updated');
+		/*
 		var request=dbObjectStore.put(tx); // update transaction in database
 		request.onsuccess=function(event)  {
 			console.log("transaction "+tx.id+" updated");
 			openAccount(); // reloads and sorts account transactions
 		};
 		request.onerror = function(event) {console.log("error updating transaction "+tx.id);};
+		*/
 	}
 	if(transfer) { // IF NECESSARY CREATE RECIPROCAL TRANSACTION IN TRANSFER ACCOUNT
 		console.log("create reciprocal transaction");
@@ -232,13 +245,19 @@ function saveTx(adding) {
 		t.text=tx.account;
 		t.transfer="none";
 		t.monthly=false;
+		/*
 		var request=dbObjectStore.add(t);
 		request.onsuccess = function(event) {
 			console.log("reciprocal transaction added in "+transfer+" account");
 			display("transaction added to "+transfer+" account");
 		};
 		request.onerror=function(event) {console.log("error adding reciprocal transaction");};
+		*/
+		logs.push(t);
+		console.log("reciprocal transaction added in "+transfer+" account");
 	}
+	saveData();
+	buildTransactionsList();
 }
 // DELETE TRANSACTION
 id('buttonDeleteTx').addEventListener('click', function() {
@@ -462,7 +481,7 @@ function buildTransactionsList() {
 	 	if(logs[list[i]].text=='gain') balance=logs[list[i].amount];
 	 	else balance+=logs[list[i]].amount;
 	 	logs[list[i]].balance=balance;
-	 	console.log('account balance: '+balance);
+	 	// console.log('account balance: '+balance);
 	 }
 	 for(i=list.length-1;i>=0;i--) { // list in reverse order
 	 	var listItem=document.createElement('li');
@@ -680,8 +699,9 @@ id("fileChooser").addEventListener('change', function() {
 		*/
 		if(json.totals) totals=json.totals
 		console.log('totals: '+totals);
-		var data=JSON.stringify(logs);
-		window.localStorage.setItem('logData',data);
+		saveData();
+		// var data=JSON.stringify(logs);
+		// window.localStorage.setItem('logData',data);
 		data=JSON.stringify(totals);
 		window.localStorage.setItem('totals',data);
 		toggleDialog('importDialog',false);
@@ -759,6 +779,12 @@ function pp(p) { // convert pence to pounds.pence (2 decimals)
 	amount+=pence;
 	return amount;
 }
+// SAVE DATA
+function saveData() {
+	var data=JSON.stringify(logs);
+	window.localStorage.setItem('logs',data);
+	console.log('data saved');
+}
 function trim(text,len) { // trime text to len characters
 	if(text.length>len) text=text.substr(0,len-3)+"...";
 	return text;
@@ -785,7 +811,7 @@ totals=JSON.parse(window.localStorage.getItem('totals')); // grand totals for ea
 console.log('totals: '+totals);
 if(totals==null) totals=[];
 console.log(totals.length+' totals');
-logData=window.localStorage.getItem('logData');
+logData=window.localStorage.getItem('logs');
 if(logData && logData!='undefined') {
 	logs=JSON.parse(logData); // restore saved logs
 	// var json=JSON.parse(logData); // restore saved data
