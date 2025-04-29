@@ -265,13 +265,15 @@ function saveTx(adding) {
 id('buttonDeleteTx').addEventListener('click', function() {
 	var text=tx.text;
 	console.log("delete transaction "+text);
-	transactions.splice(txIndex,1);
+	logs.splice(txIndex,1);
+	/*
 	var dbTransaction=db.transaction("logs","readwrite");
 	console.log("indexedDB transaction ready");
 	var dbObjectStore=dbTransaction.objectStore("logs");
 	var request=dbObjectStore.delete(tx.id);
 	request.onsuccess=function(event) {console.log("transaction "+tx.id+" deleted");};
 	request.onerror=function(event) {console.log("error deleting transaction "+tx.id);};
+	*/
 	toggleDialog("txDialog",false);
 	// buildTransactionsList();
 	listTransactions();
