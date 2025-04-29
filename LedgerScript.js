@@ -10,6 +10,7 @@ var investment=false;
 var logData=null;
 var logs=[]; // replaces transactions
 var log=null;
+var txIndex; // index of current transaction in logs[]
 // var transactions=[];
 var tx=null;
 var grandTotal=0;
@@ -199,7 +200,7 @@ function saveTx(adding) {
 	}
 	tx.monthly=id('txMonthly').checked;
     toggleDialog('txDialog',false);
-    console.log("save transaction - date: "+tx.date+" "+tx.amount+"p - "+tx.text+" app.txIndex: "+txIndex);
+    console.log("save transaction - date: "+tx.date+" "+tx.amount+"p - "+tx.text+" txIndex: "+txIndex);
     /*
     var dbTransaction=db.transaction('logs',"readwrite");
 	console.log("indexedDB transaction ready");
@@ -257,7 +258,8 @@ function saveTx(adding) {
 		console.log("reciprocal transaction added in "+transfer+" account");
 	}
 	saveData();
-	buildTransactionsList();
+	// buildTransactionsList();
+	listTransactions();
 }
 // DELETE TRANSACTION
 id('buttonDeleteTx').addEventListener('click', function() {
@@ -271,7 +273,8 @@ id('buttonDeleteTx').addEventListener('click', function() {
 	request.onsuccess=function(event) {console.log("transaction "+tx.id+" deleted");};
 	request.onerror=function(event) {console.log("error deleting transaction "+tx.id);};
 	toggleDialog("txDialog",false);
-	buildTransactionsList();
+	// buildTransactionsList();
+	listTransactions();
 });
 // SHOW/HIDE DIALOGS
 function toggleDialog(d,visible) {
@@ -295,7 +298,6 @@ function openTx() {
 	console.log("open transaction: "+txIndex+"; "+tx.text);
 	toggleDialog('txDialog',true);
 	id('txAccountChooser').selectedIndex=accountNames.indexOf(tx.account);
-	
 	id('txDateField').value=tx.date.substr(0,10);
 	id('txAmountField').value=pp(tx.amount);
 	id('txTextField').value=tx.text;
@@ -407,6 +409,8 @@ function listAccounts() {
 function openAccount() {
     account=accounts[acIndex];
 	console.log("open account #"+acIndex+": "+account.name);
+	listTransactions();
+	/*
 	// NEW CODE...
 	list=[];
 	for(var i=0;i<logs.length;i++) { // build list of indeces of account logs
@@ -421,6 +425,7 @@ function openAccount() {
 		list.shift(); // ...and remove from list
 	}
 	buildTransactionsList();
+	*/
 	/*
 	transactions=[];
 	var dbTransaction=db.transaction('logs',"readwrite");
@@ -467,6 +472,78 @@ function openAccount() {
 	*/
 }
 // LIST ACCOUNT TRANSACTIONS
+function listTransactions() {
+	list=[];
+	for(var i=0;i<logs.length;i++) { // build list of indeces of account logs
+		if(logs[i].account==account.name) list.push(i);
+	}
+	if(list.length>50) { // limit list to 50 transactions
+		console.log(">50 transactions - delete earliest");
+		if(logs[list[0]].text!='gain') logs[list[1]].amount+=logs[list[0]].amount; // create new B/F item for account
+		logs[list[1]].text="B/F";
+		logs[list[1]].monthly=false;
+		logs.splice[list[0],1]; // delete earliest account log...
+		list.shift(); // ...and remove from list
+	}
+	var item=null;
+	id('list').innerHTML="";
+	var html="";
+	var tx={};
+	var d="";
+	var mon=0;
+	var balance=0;
+	console.log("list "+list.length+" transactions");
+	for(var i in list) {
+		if(logs[list[i]].text=='gain') balance=logs[list[i].amount];
+		else balance+=logs[list[i]].amount;
+		logs[list[i]].balance=balance;
+		// console.log('account balance: '+balance);
+	}
+	for(i=list.length-1;i>=0;i--) { // list in reverse order
+		var listItem=document.createElement('li');
+		listItem.index=i;
+		listItem.classList.add('list-item');
+		tx=logs[list[i]];
+		var itemCheck=document.createElement('input');
+		itemCheck.setAttribute('type','checkbox');
+		itemCheck.setAttribute('class','check');
+		itemCheck.index=i;
+		itemCheck.checked=tx.checked;
+		itemCheck.addEventListener('change',function() { // toggle.checked property
+			tx=logs[list[this.index]];
+			tx.checked=!tx.checked;
+			console.log("checked is "+tx.checked);
+			logs[list[this.index]]=tx;
+		});
+		listItem.appendChild(itemCheck);
+		var itemText=document.createElement('span');
+		itemText.style='margin-right:50px;';
+		itemText.index=i;
+		d=tx.date;
+		mon=parseInt(d.substr(5,2))-1;
+		console.log('month '+mon);
+		mon*=3;
+		d=d.substr(8,2)+" "+months.substr(mon,3)+" "+d.substr(2,2);
+		html="<span class='date'>"+d+"</span><span class='comment'>"+trim(tx.text,10)+"</span>";
+		var a=tx.amount;
+		if(investment && tx.text=='gain') a=tx.amount-transactions[i-1].balance;
+		if(a<0) html+="<span class='amount-debit'>";
+		else html+="<span class='amount'>";
+		html+=pp(a);
+		itemText.innerHTML=html;
+		itemText.addEventListener('click', function(){txIndex=this.index; openTx();});
+		listItem.appendChild(itemText);
+		id('list').appendChild(listItem);
+	}
+	id('txSign').innerHTML='-'; // default to debit
+	accounts[acIndex].balance=balance;
+	html=trim(account.name,12)+" <i>";
+	if(balance<0) html+=" -";
+	else html+=" ";
+	html+=pp(balance)+"</i>";
+	id('headerTitle').innerHTML=html;
+}
+/* OLD LIST ACCOUNT TRANSACTIONS
 function buildTransactionsList() {
 	 var item=null;
 	 id('list').innerHTML="";
@@ -498,16 +575,6 @@ function buildTransactionsList() {
 	 	    tx.checked=!tx.checked;
 	 	    console.log("checked is "+tx.checked);
 	 	    logs[list[this.index]]=tx;
-	 	    /*
-	 	    var dbTransaction=db.transaction('logs',"readwrite");
-        	var dbObjectStore=dbTransaction.objectStore('logs');
-	        console.log("database ready");
-	 	    var request=dbObjectStore.put(tx); // update transaction in database
-		    request.onsuccess=function(event)  {
-			    console.log("transaction "+tx.id+" updated");
-    		};
-		    request.onerror = function(event) {console.log("error updating transaction "+tx.id);};
-		    */
 	 	});
 	 	listItem.appendChild(itemCheck);
 		var itemText=document.createElement('span');
@@ -529,54 +596,6 @@ function buildTransactionsList() {
 		listItem.appendChild(itemText);
 		id('list').appendChild(listItem);
 	 }
-	 /* for(var i in transactions) {
-	 	if(transactions[i].text=='gain') balance=transactions[i].amount; // NEW
-		else balance+=transactions[i].amount;
-		transactions[i].balance=balance; // save balance after each transaction in account
-	 }
-	 for(var i=transactions.length-1;i>=0;i--) { // latest at top
-		var listItem=document.createElement('li');
-		listItem.index=i;
-	  	listItem.classList.add('list-item');
-		tx=transactions[i];
-		var itemCheck=document.createElement('input');
-	 	itemCheck.setAttribute('type','checkbox');
-	 	itemCheck.setAttribute('class','check');
-	 	itemCheck.index=i;
-	 	itemCheck.checked=tx.checked;
-	 	itemCheck.addEventListener('change',function() { // toggle.checked property
-	 	    tx=transactions[this.index];
-	 	    tx.checked=!tx.checked;
-	 	    console.log("checked is "+tx.checked);
-	 	    var dbTransaction=db.transaction('logs',"readwrite");
-        	var dbObjectStore=dbTransaction.objectStore('logs');
-	        console.log("database ready");
-	 	    var request=dbObjectStore.put(tx); // update transaction in database
-		    request.onsuccess=function(event)  {
-			    console.log("transaction "+tx.id+" updated");
-    		};
-		    request.onerror = function(event) {console.log("error updating transaction "+tx.id);};
-	 	});
-	 	listItem.appendChild(itemCheck);
-		var itemText=document.createElement('span');
-		itemText.style='margin-right:50px;';
-		itemText.index=i;
-		d=tx.date;
-		mon=parseInt(d.substr(5,2))-1;
-		mon*=3;
-		d=d.substr(8,2)+" "+months.substr(mon,3)+" "+d.substr(2,2);
-		html="<span class='date'>"+d+"</span><span class='comment'>"+trim(tx.text,10)+"</span>";
-		var a=tx.amount;
-		if(investment && tx.text=='gain') a=tx.amount-transactions[i-1].balance;
-		if(a<0) html+="<span class='amount-debit'>";
-		else html+="<span class='amount'>";
-		html+=pp(a);
-		itemText.innerHTML=html;
-		itemText.addEventListener('click', function(){txIndex=this.index; openTx();});
-		listItem.appendChild(itemText);
-		id('list').appendChild(listItem);
-	 }
-	 */
 	 id('txSign').innerHTML='-'; // default to debit
 	 accounts[acIndex].balance=balance;
 	 html=trim(account.name,12)+" <i>";
@@ -585,6 +604,7 @@ function buildTransactionsList() {
 	 html+=pp(balance)+"</i>";
 	 id('headerTitle').innerHTML=html;
 }
+*/
 // DRAW ACCOUNT GRAPH
 function drawGraph() {
 	console.log('ACCOUNT GRAPH');
