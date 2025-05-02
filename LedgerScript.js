@@ -163,7 +163,7 @@ id('buttonAddNewAccount').addEventListener('click',function() {
 id('txDateField').addEventListener('change', function() {
 	console.log("change date");
 })
-// TOGGLE TRANSACTION W SIGN
+// TOGGLE TRANSACTION SIGN
 id('txSign').addEventListener('click', function() {
 	var s=id('txSign').innerHTML;
 	console.log("toggle sign - currently "+s);
@@ -193,6 +193,7 @@ function saveTx(adding) {
 	if(investment) transfer=null;
 	else {
 		var i=id('txTransferChooser').selectedIndex;
+		console.log('choose option '+i);
 		var transfer=id('txTransferChooser').options[i].text;
 		console.log("transfer to:"+transfer);
 		if((transfer=="none")||(transfer==tx.transfer)) transfer=null; // (usually) no need to create reciprocal transaction
@@ -225,7 +226,7 @@ function saveTx(adding) {
 		}
 	}
 	else { // update existing transaction
-		logs[list[txIndex]]=tx;
+		logs[txIndex]=tx;
 		console.log('transaction updated');
 		/*
 		var request=dbObjectStore.put(tx); // update transaction in database
@@ -257,14 +258,14 @@ function saveTx(adding) {
 		logs.push(t);
 		console.log("reciprocal transaction added in "+transfer+" account");
 	}
-	saveData();
+	saveLogs();
 	// buildTransactionsList();
 	listTransactions();
 }
 // DELETE TRANSACTION
 id('buttonDeleteTx').addEventListener('click', function() {
 	var text=tx.text;
-	console.log("delete transaction "+text);
+	console.log("delete transaction "+txIndex+': '+text);
 	logs.splice(txIndex,1);
 	/*
 	var dbTransaction=db.transaction("logs","readwrite");
@@ -275,6 +276,7 @@ id('buttonDeleteTx').addEventListener('click', function() {
 	request.onerror=function(event) {console.log("error deleting transaction "+tx.id);};
 	*/
 	toggleDialog("txDialog",false);
+	saveLogs();
 	// buildTransactionsList();
 	listTransactions();
 });
@@ -294,8 +296,11 @@ function toggleDialog(d,visible) {
 	}
 }
 // OPEN SELECTED TRANSACTION FOR EDITING
-function openTx() {
-	tx=logs[list[txIndex]];
+function openTx(n) {
+	console.log('open transaction '+n);
+	txIndex=list[n];
+	console.log('log index is '+txIndex);
+	tx=logs[txIndex];
 	console.log("transaction date: "+tx.date);
 	console.log("open transaction: "+txIndex+"; "+tx.text);
 	toggleDialog('txDialog',true);
@@ -328,7 +333,7 @@ function openTx() {
 		id('txTextField').disabled=false;
 	}
 	if(tx.text=="B/F") { // can only change date or amount of earliest B/F item
-		var n=transactions.length;
+		var n=logs.length;
 		console.log("limit edits txIndex:"+txIndex+" "+n+" items");
 		id('txAccountChooser').disabled=true;
 		id('txTextField').disabled=true;
@@ -477,15 +482,25 @@ function openAccount() {
 function listTransactions() {
 	list=[];
 	for(var i=0;i<logs.length;i++) { // build list of indeces of account logs
-		if(logs[i].account==account.name) list.push(i);
+		if(logs[i].account==account.name) {
+			console.log('add log '+i+': '+logs[i].text+'; '+logs[i].amount);
+			list.push(i);
+		}
 	}
 	if(list.length>50) { // limit list to 50 transactions
-		console.log(">50 transactions - delete earliest");
-		if(logs[list[0]].text!='gain') logs[list[1]].amount+=logs[list[0]].amount; // create new B/F item for account
-		logs[list[1]].text="B/F";
-		logs[list[1]].monthly=false;
-		logs.splice[list[0],1]; // delete earliest account log...
-		list.shift(); // ...and remove from list
+		console.log(logs.length+' logs; '+list.length+" items ie. >50 transactions - delete earliest");
+		if(logs[list[0]].text!='gain') {
+			var earliest=list[0];
+			console.log('earliest is '+earliest+'; next is '+list[1]);
+			logs[list[1]].amount+=logs[list[0]].amount; // create new B/F item for account
+			logs[list[1]].text="B/F";
+			logs[list[1]].monthly=false;
+			console.log('earliest transaction now '+list[1]+': '+logs[list[1]].text+' '+logs[list[1]].amount);
+		}
+		console.log('delete log '+earliest+': '+logs[earliest].amount);
+		logs.splice(earliest,1); // delete earliest account log...
+		list.pop(); // ...and remove last transaction from list because removing first shifts all logs down one
+		saveLogs(); // update data
 	}
 	var item=null;
 	id('list').innerHTML="";
@@ -494,7 +509,7 @@ function listTransactions() {
 	var d="";
 	var mon=0;
 	var balance=0;
-	console.log("list "+list.length+" transactions");
+	console.log("list "+list.length+" transactions - earliest is "+list[0]+' £'+logs[list[0]].amount);
 	for(var i in list) {
 		if(logs[list[i]].text=='gain') balance=logs[list[i].amount];
 		else balance+=logs[list[i]].amount;
@@ -533,7 +548,7 @@ function listTransactions() {
 		else html+="<span class='amount'>";
 		html+=pp(a);
 		itemText.innerHTML=html;
-		itemText.addEventListener('click', function(){txIndex=this.index; openTx();});
+		itemText.addEventListener('click', function(){openTx(this.index);});
 		listItem.appendChild(itemText);
 		id('list').appendChild(listItem);
 	}
@@ -721,7 +736,7 @@ id("fileChooser").addEventListener('change', function() {
 		*/
 		if(json.totals) totals=json.totals
 		console.log('totals: '+totals);
-		saveData();
+		saveLogs();
 		// var data=JSON.stringify(logs);
 		// window.localStorage.setItem('logData',data);
 		data=JSON.stringify(totals);
@@ -802,7 +817,8 @@ function pp(p) { // convert pence to pounds.pence (2 decimals)
 	return amount;
 }
 // SAVE DATA
-function saveData() {
+function saveLogs() {
+	console.log('save '+logs.length+' logs');
 	var data=JSON.stringify(logs);
 	window.localStorage.setItem('logs',data);
 	console.log('data saved');
