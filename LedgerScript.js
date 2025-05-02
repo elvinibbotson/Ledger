@@ -487,6 +487,8 @@ function listTransactions() {
 			list.push(i);
 		}
 	}
+	investment=logs[list[0]].transfer=='investment';
+    console.log('investment account: '+investment);
 	if(list.length>50) { // limit list to 50 transactions
 		console.log(logs.length+' logs; '+list.length+" items ie. >50 transactions - delete earliest");
 		if(logs[list[0]].text!='gain') {
@@ -511,7 +513,7 @@ function listTransactions() {
 	var balance=0;
 	console.log("list "+list.length+" transactions - earliest is "+list[0]+' £'+logs[list[0]].amount);
 	for(var i in list) {
-		if(logs[list[i]].text=='gain') balance=logs[list[i].amount];
+		if(logs[list[i]].text=='gain') balance=logs[list[i]].amount;
 		else balance+=logs[list[i]].amount;
 		logs[list[i]].balance=balance;
 		// console.log('account balance: '+balance);
@@ -538,12 +540,15 @@ function listTransactions() {
 		itemText.index=i;
 		d=tx.date;
 		mon=parseInt(d.substr(5,2))-1;
-		console.log('month '+mon);
+		// console.log('month '+mon);
 		mon*=3;
 		d=d.substr(8,2)+" "+months.substr(mon,3)+" "+d.substr(2,2);
 		html="<span class='date'>"+d+"</span><span class='comment'>"+trim(tx.text,10)+"</span>";
 		var a=tx.amount;
-		if(investment && tx.text=='gain') a=tx.amount-transactions[i-1].balance;
+		if(investment && tx.text=='gain') {
+			console.log('investment');
+			a=tx.amount-logs[list[i-1]].balance;
+		}
 		if(a<0) html+="<span class='amount-debit'>";
 		else html+="<span class='amount'>";
 		html+=pp(a);
