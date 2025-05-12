@@ -258,6 +258,9 @@ function saveTx(adding) {
 		logs.push(t);
 		console.log("reciprocal transaction added in "+transfer+" account");
 	}
+	// NEW - KEEP LL LOGS IN CHRONOLOGICAL ORDER
+	logs.sort(function(a,b) { return Date.parse(a.date)-Date.parse(b.date)}); //chronological order
+	//
 	saveLogs();
 	// buildTransactionsList();
 	listTransactions();
@@ -393,7 +396,7 @@ function listAccounts() {
 			id('txTransferChooser').options.add(ac);
 	  	}
 	  	console.log("transfer option 0: "+id('txTransferChooser').options[0].text);
-		html="Ledger <i>"+pp(grandTotal)+"</i>";
+		html="Ledger <span class='amount'>"+pp(grandTotal)+"</span>";
 		today=new Date();
 		var month=today.getMonth()+1;
 		console.log('save total '+grandTotal+' for month '+month);
@@ -542,8 +545,8 @@ function listTransactions() {
 		mon=parseInt(d.substr(5,2))-1;
 		// console.log('month '+mon);
 		mon*=3;
-		d=d.substr(8,2)+" "+months.substr(mon,3)+" "+d.substr(2,2);
-		html="<span class='date'>"+d+"</span><span class='comment'>"+trim(tx.text,10)+"</span>";
+		d=d.substr(8,2)+" "+months.substr(mon,3); // +" "+d.substr(2,2);
+		html="<span class='date'>"+d+"</span><span class='comment'>"+trim(tx.text,15)+"</span>";
 		var a=tx.amount;
 		if(investment && tx.text=='gain') {
 			console.log('investment');
@@ -559,10 +562,10 @@ function listTransactions() {
 	}
 	id('txSign').innerHTML='-'; // default to debit
 	accounts[acIndex].balance=balance;
-	html=trim(account.name,12)+" <i>";
-	if(balance<0) html+=" -";
-	else html+=" ";
-	html+=pp(balance)+"</i>";
+	html=trim(account.name,15)+"<span class='amount'>";
+	if(balance<0) html+="-";
+	// else html+=" ";
+	html+=pp(balance)+"</span>";
 	id('headerTitle').innerHTML=html;
 }
 /* OLD LIST ACCOUNT TRANSACTIONS
