@@ -258,11 +258,8 @@ function saveTx(adding) {
 		logs.push(t);
 		console.log("reciprocal transaction added in "+transfer+" account");
 	}
-	// NEW - KEEP LL LOGS IN CHRONOLOGICAL ORDER
-	logs.sort(function(a,b) { return Date.parse(a.date)-Date.parse(b.date)}); //chronological order
-	//
+	logs.sort(function(a,b) {return Date.parse(a.date)-Date.parse(b.date)}); // chronological order
 	saveLogs();
-	// buildTransactionsList();
 	listTransactions();
 }
 // DELETE TRANSACTION
@@ -503,9 +500,14 @@ function listTransactions() {
 			console.log('earliest transaction now '+list[1]+': '+logs[list[1]].text+' '+logs[list[1]].amount);
 		}
 		console.log('delete log '+earliest+': '+logs[earliest].amount);
-		logs.splice(earliest,1); // delete earliest account log...
-		list.pop(); // ...and remove last transaction from list because removing first shifts all logs down one
+		list.shift(); // remove first transaction from list
+		logs.splice(earliest,1); // ...and delete what was earliest log...
+		console.log('list of '+list.length+' now starts with '+logs[list[0]].text);
+		// console.log(' and ends with '+logs[list[list.length-1]].text);
 		saveLogs(); // update data
+		
+		// TRY RECURSION
+		listTransactions();
 	}
 	var item=null;
 	id('list').innerHTML="";
