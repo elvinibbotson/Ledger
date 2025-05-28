@@ -22,6 +22,7 @@ var view='list';
 var canvas=null;
 var today;
 var months="JanFebMarAprMayJunJulAugSepOctNovDec";
+var root; // OPFS root directory
 // DRAG LEFT/RIGHT ACTIONS
 id('main').addEventListener('touchstart', function(event) {
     // console.log(event.changedTouches.length+" touches");
@@ -217,7 +218,7 @@ function saveTx(adding) {
 		console.log("reciprocal transaction added in "+transfer+" account");
 	}
 	logs.sort(function(a,b) {return Date.parse(a.date)-Date.parse(b.date)}); // chronological order
-	saveLogs();
+	writeData(); // WAS saveLogs();
 	listTransactions();
 }
 // DELETE TRANSACTION
@@ -226,7 +227,7 @@ id('buttonDeleteTx').addEventListener('click', function() {
 	console.log("delete transaction "+txIndex+': '+text);
 	logs.splice(txIndex,1);
 	toggleDialog("txDialog",false);
-	saveLogs();
+	writeData(); // WAS saveLogs();
 	listTransactions();
 });
 // SHOW/HIDE DIALOGS
@@ -384,7 +385,7 @@ function listTransactions() {
 		logs.splice(earliest,1); // ...and delete what was earliest log...
 		console.log('list of '+list.length+' now starts with '+logs[list[0]].text);
 		// console.log(' and ends with '+logs[list[list.length-1]].text);
-		saveLogs(); // update data
+		writeData(); // WAS saveLogs();
 		listTransactions(); // recursion
 	}
 	var item=null;
@@ -550,9 +551,11 @@ id("fileChooser").addEventListener('change', function() {
 		console.log(logs.length+" logs loaded");
 		if(json.totals) totals=json.totals
 		console.log('totals: '+totals);
-		saveLogs();
+		writeData(); // WAS saveLogs();
+		/* OLD CODE...
 		data=JSON.stringify(totals);
 		window.localStorage.setItem('totals',data);
+		*/
 		toggleDialog('importDialog',false);
 		display("backup imported - restart");
   	});
@@ -585,13 +588,101 @@ function pp(p) { // convert pence to pounds.pence (2 decimals)
 	amount+=pence;
 	return amount;
 }
-// SAVE DATA
+// OPFS
+async function readData() {
+	root=await navigator.storage.getDirectory();
+	console.log('OPFS root directory: '+root);
+	var handle=await root.getFileHandle('LedgerData');
+	var file=await handle.getFile();
+	var loader=new FileReader();
+    	loader.addEventListener('load',function(evt) {
+        	var data=evt.target.result;
+        	console.log('data: '+data.length+' bytes');
+      		logs=JSON.parse(data);
+      		logs.sort(function(a,b) { return Date.parse(a.date)-Date.parse(b.date)}); //chronological order
+			// build accounts array
+   			accounts=[];
+			var acNames=[];
+    		var n=0;
+    		for(var i in logs) { // build list of accounts
+				var today=new Date();
+				var month=today.getFullYear()*12+today.getMonth()+1; // months count
+    			today=today.getDate();
+    			if(logs[i].monthly) { // deal with monthly repeats
+    				console.log("monthly repeat check");
+					var transfer=false;
+    				var txDate=logs[i].date; // YYYY-MM-DD
+    				var txMonth=parseInt(txDate.substr(0,4))*12+parseInt(txDate.substr(5,2)); // months count
+    				var txDay=txDate.substr(8,2);
+    				if((((month-txMonth)>1))||(((month-txMonth)==1)&&(today>=txDay))) { // one month or more later
+    					console.log(">> add repeat transaction for "+logs[i].text);
+						logs[i].monthly=false; // cancel monthly repeat
+    					var tx={}; // create repeat transaction
+    					tx.account=logs[i].account;
+    					console.log('repeat tx account: '+tx.account);
+    					txMonth+=1; // next month (could be next year too)
+    					tx.date=Math.floor(txMonth/12).toString()+"-";
+						txMonth%=12;
+    					if(txMonth<10) tx.date+='0'; // isoDate+="0";
+    					tx.date+=txMonth.toString()+"-"+txDay;
+    					console.log('repeat tx date: '+tx.date);
+    					console.log("monthly transaction date: "+txDate+"; repeat: "+tx.date);
+    					tx.amount=logs[i].amount;
+    					tx.checked=false;
+						tx.text=logs[i].text;
+						tx.transfer=logs[i].transfer;
+    					var transferTX={};
+    					if(tx.transfer!="none") {
+    						transfer=true;
+    						transferTX.account=tx.transfer;
+    						transferTX.checked=false;
+							transferTX.date=tx.date;
+							transferTX.amount=-1*tx.amount;
+    						transferTX.text=tx.account;
+    						transferTX.monthly=false;
+    					}
+    					tx.monthly=true;
+    					logs.push(tx);
+					}
+					if(transfer) { // IF MONTHLY TRANSACTION IS TRANSFER CREATE RECIPROCAL TRANSACTION
+						logs.push(transferTX);
+					}
+    			}  // END OF REPEAT TRANSACTION CODE
+    			n=acNames.indexOf(logs[i].account);
+				if(n<0) {
+	  				console.log("add account "+logs[i].account);
+	  				acNames.push(logs[i].account);
+	  				accounts.push({name: logs[i].account, balance: logs[i].amount});
+	  			}
+	  			else {
+	  				if(logs[i].text=='gain') accounts[n].balance=logs[i].amount;
+					else accounts[n].balance+=logs[i].amount;
+	  			}
+    		}
+  			console.log(accounts.length+" accounts");
+			listAccounts();
+    	});
+    	loader.addEventListener('error',function(event) {
+        	console.log('load failed - '+event);
+    	});
+    	loader.readAsText(file);
+}
+async function writeData() {
+	var handle=await root.getFileHandle('LedgerData',{create:true});
+	var data=JSON.stringify(logs);
+	var writable=await handle.createWritable();
+    await writable.write(data);
+    await writable.close();
+	console.log('data saved to LedgerData');
+}
+/* OLD SAVE DATA
 function saveLogs() {
 	console.log('save '+logs.length+' logs');
 	var data=JSON.stringify(logs);
 	window.localStorage.setItem('logs',data);
 	console.log('data saved');
 }
+*/
 function trim(text,len) { // trime text to len characters
 	if(text.length>len) text=text.substr(0,len-3)+"...";
 	return text;
@@ -613,6 +704,8 @@ totals=JSON.parse(window.localStorage.getItem('totals')); // grand totals for ea
 console.log('totals: '+totals);
 if(totals==null) totals=[];
 console.log(totals.length+' totals');
+readData();
+/* OLD LOAD CODE
 logData=window.localStorage.getItem('logs');
 if(logData && logData!='undefined') {
 	logs=JSON.parse(logData); // restore saved logs
@@ -681,6 +774,7 @@ if(logData && logData!='undefined') {
 	listAccounts();
 }
 else toggleDialog('importDialog',true);
+*/
 // implement service worker if browser is PWA friendly
 if (navigator.serviceWorker.controller) {
 	console.log('Active service worker found, no need to register')
