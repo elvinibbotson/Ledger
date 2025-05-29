@@ -592,6 +592,8 @@ function pp(p) { // convert pence to pounds.pence (2 decimals)
 async function readData() {
 	root=await navigator.storage.getDirectory();
 	console.log('OPFS root directory: '+root);
+	var persisted=await navigator.storage.persist();
+	console.log('persisted: '+persisted);
 	var handle=await root.getFileHandle('LedgerData');
 	var file=await handle.getFile();
 	var loader=new FileReader();
