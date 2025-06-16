@@ -529,7 +529,7 @@ function load() {
 	var data=localStorage.getItem('ledgerData');
 	if(!data) {
 		id('restoreMessage').innerText='no data - restore?';
-		toggle('restoreDialog',true);
+		toggleDialog('restoreDialog',true);
 		return;
 	}
 	logs=JSON.parse(data);
@@ -640,7 +640,7 @@ id("fileChooser").addEventListener('change', function() {
 		data=JSON.stringify(totals);
 		window.localStorage.setItem('totals',data);
 		*/
-		toggleDialog('importDialog',false);
+		toggleDialog('restoreDialog',false);
 		// display("backup imported - restart");
 		load(); // WAS readData();
   	});
