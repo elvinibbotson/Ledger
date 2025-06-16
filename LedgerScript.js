@@ -608,7 +608,9 @@ function save() {
 	// writeData();
 }
 id('backupButton').addEventListener('click',function() {toggleDialog('dataDialog',false); backup();});
-id('restoreButton').addEventListener('click',function() {toggleDialog('restoreDialog',true)});
+id('restoreButton').addEventListener('click',function() {
+	toggleDialog('restoreDialog',true)
+});
 id("fileChooser").addEventListener('change', function() {
 	var file=id('fileChooser').files[0];
 	console.log("file: "+file+" name: "+file.name);
