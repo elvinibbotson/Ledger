@@ -3,7 +3,6 @@ html, body {
   margin: 0;
   height: 100%;
   width: 100%;
-  /* font-family: 'Helvetica', 'Verdana', sans-serif;*/
   font-family: 'Courier',monospace;
   font-weight: 400;
   color: white;
@@ -223,7 +222,7 @@ select {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch; 
   background: &333;
-    /* margin-top: 30px; */
+    /*margin-top: 30px;*/
     width: 100%;
     position: relative;
     color: white;
@@ -235,6 +234,12 @@ select {
   font-weight: bold;
   font-size: 1.2em;
   margin: 10px;
+}
+
+#listPanel {
+	position: absolute;
+	top: 36px;
+	width: 100%;
 }
 
 #buttonNew {

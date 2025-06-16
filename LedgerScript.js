@@ -53,6 +53,7 @@ id('main').addEventListener('touchend', function(event) {
     			view='totals';
     			id('listPanel').style.display='none';
     			id('buttonNew').style.display='none';
+    			id('header').style.display='none';
     			drawTotals();
     		}
     	}
@@ -63,7 +64,7 @@ id('main').addEventListener('touchend', function(event) {
     		id('graphPanel').style.display='none';
     		id('graphOverlay').style.display='none';
     		id('listPanel').style.display='block';
-    		id('heading').style.display='block';
+    		id('header').style.display='block';
     		id('buttonNew').style.display='block';
     	}
     }
