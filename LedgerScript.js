@@ -609,6 +609,7 @@ function save() {
 }
 id('backupButton').addEventListener('click',function() {toggleDialog('dataDialog',false); backup();});
 id('restoreButton').addEventListener('click',function() {
+	id('restoreMessage').innerText='Restore from file';
 	toggleDialog('restoreDialog',true)
 });
 id("fileChooser").addEventListener('change', function() {
