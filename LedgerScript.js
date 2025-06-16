@@ -21,6 +21,7 @@ var currentDialog=null;
 var view='list';
 var canvas=null;
 var today;
+var backupDay;
 var months="JanFebMarAprMayJunJulAugSepOctNovDec";
 var root; // OPFS root directory
 // DRAG LEFT/RIGHT ACTIONS
@@ -69,11 +70,12 @@ id('main').addEventListener('touchend', function(event) {
 })
 // TAP HEADER - DATA MENU
 id('header').addEventListener('click',function() {toggleDialog('dataDialog',true);})
-// DISPLAY MESSAGE
+/* DISPLAY MESSAGE
 function display(message) {
 	id('message').innerText=message;
 	toggleDialog('messageDialog',true);
 }
+*/
 // NEW BUTTON: create new account or transaction
 id('buttonNew').addEventListener('click',function() {
 	console.log("new");
@@ -172,7 +174,7 @@ id('buttonSaveTx').addEventListener('click',function() {
 })
 // ADD/SAVE TRANSACTION
 function saveTx(adding) {
-	window.localStorage.setItem('changed',true); // assume saving means data changed
+	// window.localStorage.setItem('changed',true); // assume saving means data changed
 	tx.account=accountNames[id('txAccountChooser').selectedIndex];
 	tx.date=id('txDateField').value;
 	tx.amount=Math.round(id('txAmountField').value*100);
@@ -194,7 +196,7 @@ function saveTx(adding) {
 	if(adding) { // add new transaction
 		var earliest=logs[0].date; // date of earliest transaction in account
 		console.log("add new transaction date "+tx.date+" - oldest is "+earliest);
-		if(tx.date<earliest) display("TOO EARLY");
+		if(tx.date<earliest) alert("TOO EARLY");
 		else { // add new transaction to indexedDB
 			logs.push(tx);
 			console.log("transaction added");
@@ -218,7 +220,7 @@ function saveTx(adding) {
 		console.log("reciprocal transaction added in "+transfer+" account");
 	}
 	logs.sort(function(a,b) {return Date.parse(a.date)-Date.parse(b.date)}); // chronological order
-	writeData(); // WAS saveLogs();
+	save(); // writeData(); WAS saveLogs();
 	listTransactions();
 }
 // DELETE TRANSACTION
@@ -227,7 +229,7 @@ id('buttonDeleteTx').addEventListener('click', function() {
 	console.log("delete transaction "+txIndex+': '+text);
 	logs.splice(txIndex,1);
 	toggleDialog("txDialog",false);
-	writeData(); // WAS saveLogs();
+	save(); // writeData(); WAS saveLogs();
 	listTransactions();
 });
 // SHOW/HIDE DIALOGS
@@ -385,7 +387,7 @@ function listTransactions() {
 		logs.splice(earliest,1); // ...and delete what was earliest log...
 		console.log('list of '+list.length+' now starts with '+logs[list[0]].text);
 		// console.log(' and ends with '+logs[list[list.length-1]].text);
-		writeData(); // WAS saveLogs();
+		save(); // writeData(); WAS saveLogs();
 		listTransactions(); // recursion
 	}
 	var item=null;
@@ -523,9 +525,90 @@ function drawTotals() {
 	for(i=0;i<12;i++) canvas.fillText(months.substr(i*3,1),(((i+d)%12)*w)+10,36);
 }
 // DATA
+function load() {
+	var data=localStorage.getItem('ledgerData');
+	if(!data) {
+		id('restoreMessage').innerText='no data - restore?';
+		toggle('restoreDialog',true);
+		return;
+	}
+	logs=JSON.parse(data);
+	logs.sort(function(a,b) { return Date.parse(a.date)-Date.parse(b.date)}); //chronological order
+	// build accounts array
+   	accounts=[];
+	var acNames=[];
+    var n=0;
+    for(var i in logs) { // build list of accounts
+		var today=new Date();
+		var month=today.getFullYear()*12+today.getMonth()+1; // months count
+    	today=today.getDate();
+    	if(logs[i].monthly) { // deal with monthly repeats
+    		console.log("monthly repeat check");
+			var transfer=false;
+    		var txDate=logs[i].date; // YYYY-MM-DD
+    		var txMonth=parseInt(txDate.substr(0,4))*12+parseInt(txDate.substr(5,2)); // months count
+    		var txDay=txDate.substr(8,2);
+    		if((((month-txMonth)>1))||(((month-txMonth)==1)&&(today>=txDay))) { // one month or more later
+    			console.log(">> add repeat transaction for "+logs[i].text);
+				logs[i].monthly=false; // cancel monthly repeat
+    			var tx={}; // create repeat transaction
+    			tx.account=logs[i].account;
+    			console.log('repeat tx account: '+tx.account);
+    			txMonth+=1; // next month (could be next year too)
+    			tx.date=Math.floor(txMonth/12).toString()+"-";
+				txMonth%=12;
+    			if(txMonth<10) tx.date+='0'; // isoDate+="0";
+    			tx.date+=txMonth.toString()+"-"+txDay;
+    			console.log('repeat tx date: '+tx.date);
+    			console.log("monthly transaction date: "+txDate+"; repeat: "+tx.date);
+    			tx.amount=logs[i].amount;
+    			tx.checked=false;
+				tx.text=logs[i].text;
+				tx.transfer=logs[i].transfer;
+    			var transferTX={};
+    			if(tx.transfer!="none") {
+    				transfer=true;
+    				transferTX.account=tx.transfer;
+    				transferTX.checked=false;
+					transferTX.date=tx.date;
+					transferTX.amount=-1*tx.amount;
+    				transferTX.text=tx.account;
+    				transferTX.monthly=false;
+    			}
+    			tx.monthly=true;
+    			logs.push(tx);
+			}
+			if(transfer) { // IF MONTHLY TRANSACTION IS TRANSFER CREATE RECIPROCAL TRANSACTION
+				logs.push(transferTX);
+			}
+    	}  // END OF REPEAT TRANSACTION CODE
+    	n=acNames.indexOf(logs[i].account);
+		if(n<0) {
+	  		console.log("add account "+logs[i].account);
+	  		acNames.push(logs[i].account);
+	  		accounts.push({name: logs[i].account, balance: logs[i].amount});
+	  	}
+	  	else {
+	  		if(logs[i].text=='gain') accounts[n].balance=logs[i].amount;
+			else accounts[n].balance+=logs[i].amount;
+	  	}
+    }
+  	console.log(accounts.length+" accounts");
+	listAccounts();
+}
+function save() {
+	var json=JSON.stringify(logs);
+	window.localStorage.setItem('ledgerData',json);
+	today=Math.floor(new Date().getTime()/86400000);
+	var days=today-backupDay;
+	if(days>0) {
+		id('backupMessage').innerText=days+' since last backup';
+		toggleDialog('backupDialog',true);
+	}
+	// writeData();
+}
 id('backupButton').addEventListener('click',function() {toggleDialog('dataDialog',false); backup();});
-id('importButton').addEventListener('click',function() {toggleDialog('importDialog',true)});
-// RESTORE BACKUP
+id('restoreButton').addEventListener('click',function() {toggleDialog('restoreDialog',true)});
 id("fileChooser").addEventListener('change', function() {
 	var file=id('fileChooser').files[0];
 	console.log("file: "+file+" name: "+file.name);
@@ -551,17 +634,19 @@ id("fileChooser").addEventListener('change', function() {
 		console.log(logs.length+" logs loaded");
 		if(json.totals) totals=json.totals
 		console.log('totals: '+totals);
-		writeData(); // WAS saveLogs();
+		// writeData(); // WAS saveLogs();
+		save();
 		/* OLD CODE...
 		data=JSON.stringify(totals);
 		window.localStorage.setItem('totals',data);
 		*/
 		toggleDialog('importDialog',false);
-		display("backup imported - restart");
+		// display("backup imported - restart");
+		load(); // WAS readData();
   	});
   	fileReader.readAsText(file);
 });
-// BACKUP
+id('confirmBackup').addEventListener('click',backup);
 function backup() {
   	var fileName="LedgerData.json";
   	var data={'logs':logs,'totals':totals};
@@ -575,7 +660,10 @@ function backup() {
    	a.download=fileName;
     document.body.appendChild(a);
     a.click();
-    display(fileName+" saved to downloads folder");
+    today=Math.floor(new Date().getTime()/86400000);
+    window.localStorage.setItem('backupDay',today);
+    // display(fileName+" saved to downloads folder");
+    toggleDialog('backupDialog',false);
 }
 function id(el) {
 	return document.getElementById(el);
@@ -588,7 +676,7 @@ function pp(p) { // convert pence to pounds.pence (2 decimals)
 	amount+=pence;
 	return amount;
 }
-// OPFS
+/* OPFS
 async function readData() {
 	root=await navigator.storage.getDirectory();
 	console.log('OPFS root directory: '+root);
@@ -675,14 +763,15 @@ async function writeData() {
 	var writable=await handle.createWritable();
     await writable.write(data);
     await writable.close();
-	console.log('data saved to LedgerData');
-}
-/* OLD SAVE DATA
-function saveLogs() {
-	console.log('save '+logs.length+' logs');
-	var data=JSON.stringify(logs);
-	window.localStorage.setItem('logs',data);
-	console.log('data saved');
+	console.log('data saved to LedgerData file');
+	window.localStorage.setItem('ledgerData',data);
+	console.log('and to localStorage');
+	today=Math.floor(new Date().getTime()/86400000);
+	var days=today-backupDay;
+	if(days>0) {
+		id('backupMessage').innerText=days+' since last backup';
+		toggleDialog('backupDialog',true);
+	}
 }
 */
 function trim(text,len) { // trime text to len characters
@@ -706,7 +795,10 @@ totals=JSON.parse(window.localStorage.getItem('totals')); // grand totals for ea
 console.log('totals: '+totals);
 if(totals==null) totals=[];
 console.log(totals.length+' totals');
-readData();
+backupDay=window.localStorage.getItem('backupDay');
+if(backupDay) console.log('last backup on day '+backupDay);
+else backupDay=0;
+load(); // WAS readData();
 /* OLD LOAD CODE
 logData=window.localStorage.getItem('logs');
 if(logData && logData!='undefined') {
@@ -794,3 +886,4 @@ else { // Register the ServiceWorker
 	    console.log('Service worker has been registered for scope:'+ reg.scope);
 	});
 }
+ 
