@@ -354,7 +354,7 @@ function listAccounts() {
 		console.log('save totals... '+totals);
 	}
 	id('headerTitle').innerHTML=html;
-	id('listPanel').scrollIntoView(0,0);
+	id('listPanel').scrollIntoView();
 }
 // OPEN ACCOUNT
 function openAccount() {
@@ -596,21 +596,22 @@ function load() {
     }
   	console.log(accounts.length+" accounts");
 	listAccounts();
+	today=Math.floor(new Date().getTime()/86400000);
+	var days=today-backupDay;
+	if(days>15) days='ages';
+	if(days>4) { // backup reminder every 5 days
+		id('backupMessage').innerText=days+' since last backup';
+		toggleDialog('backupDialog',true);
+	}
 }
 function save() {
 	var json=JSON.stringify(logs);
 	window.localStorage.setItem('ledgerData',json);
-	today=Math.floor(new Date().getTime()/86400000);
-	var days=today-backupDay;
-	if(days>0) {
-		id('backupMessage').innerText=days+' since last backup';
-		toggleDialog('backupDialog',true);
-	}
 	// writeData();
 }
 id('backupButton').addEventListener('click',function() {toggleDialog('dataDialog',false); backup();});
 id('restoreButton').addEventListener('click',function() {
-	id('restoreMessage').innerText='Restore from file';
+	id('restoreMessage').innerText='restore from file';
 	toggleDialog('restoreDialog',true)
 });
 id("fileChooser").addEventListener('change', function() {
